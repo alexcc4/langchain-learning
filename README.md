@@ -7,6 +7,7 @@
 - 📄 加载和处理中文 PDF 文档
 - 🔍 基于语义的文档搜索
 - 💬 **RAG 智能问答系统**（基于检索增强生成）
+- 🚀 **Agentic RAG** - 带文档评分与智能问题重写
 - 🤖 使用 Ollama 本地模型 (qwen3-embedding + qwen3:latest)
 - 💾 ChromaDB 向量数据库持久化存储
 - 🐳 Docker 部署 ChromaDB
@@ -57,17 +58,22 @@ docker-compose logs -f chromadb
 
 ### 4. 准备 Ollama 模型
 
-确保已经安装了 Ollama 并拉取了 qwen3-embedding 模型：
+确保已经安装了 Ollama 并拉取所需模型：
 
 ```bash
-# 拉取模型
+# 拉取 embedding 模型
 ollama pull qwen3-embedding
+
+# 拉取 chat 模型（RAG 问答系统需要）
+ollama pull qwen3:latest
 
 # 验证模型
 ollama list
 ```
 
 ### 5. 运行程序
+
+#### 索引 PDF 文档
 
 ```bash
 python main.py
@@ -84,6 +90,19 @@ python main.py
 
 **断点续传**: 如果中途按 `Ctrl+C` 中断，重新运行会从上次位置继续。
 
+#### 运行 Agentic RAG 问答系统
+
+```bash
+python rag_app.py
+```
+
+**前置条件**:
+
+- 已运行 `main.py` 完成文档索引
+- 已安装 `qwen3:latest` 模型 (`ollama pull qwen3:latest`)
+
+系统会自动执行测试问题，然后进入交互模式。输入 `quit` 退出。
+
 ## 项目结构
 
 ```bash
@@ -91,7 +110,8 @@ python main.py
 ├── data/                   # PDF 文档目录
 │   └── 西游记.pdf
 ├── chroma_data/           # ChromaDB 数据持久化目录
-├── main.py                # 主程序
+├── main.py                # 索引程序（文档处理与向量化）
+├── rag_app.py             # Agentic RAG 问答系统
 ├── docker-compose.yml     # Docker Compose 配置
 ├── DOCKER.md             # Docker 使用说明
 ├── .env                  # 环境变量配置（不提交到 git）
@@ -150,12 +170,42 @@ retriever = vector_store.as_retriever(
 results = retriever.invoke("猪八戒")
 ```
 
-### 使用 RAG 智能问答系统
+### 使用 Agentic RAG 智能问答系统
+
+直接运行：
+
+```bash
+python rag_app.py
+```
+
+或在代码中使用：
 
 ```python
-rag_app.chat("孙悟空是怎么出生的？")
-rag_app.chat("唐僧为什么要去西天取经？")
-rag_app.chat("猪八戒的前世是什么？")
+from rag_app import chat
+
+chat("孙悟空是怎么出生的？")
+chat("唐僧为什么要去西天取经？")
+chat("猪八戒的前世是什么？")
+```
+
+#### Agentic RAG 特性
+
+与传统 RAG 不同，Agentic RAG 系统具有以下智能特性：
+
+1. **文档相关性评分** - 自动评估检索到的文档是否真正相关
+2. **智能问题重写** - 当文档不相关时，自动重写问题并重新检索
+3. **条件路由** - 根据评分结果智能决定下一步操作
+4. **流程可视化** - 打印每个节点的执行过程，便于调试
+
+**工作流程**：
+
+```text
+用户提问 
+  → 生成查询或响应（决定是否检索）
+  → 检索文档
+  → 文档评分
+  ├─ 相关 → 生成答案
+  └─ 不相关 → 重写问题 → 重新检索
 ```
 
 ## 注意事项
